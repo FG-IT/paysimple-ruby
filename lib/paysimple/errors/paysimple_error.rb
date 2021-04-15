@@ -15,7 +15,7 @@ module Paysimple
 
     def to_s
       status_string = @http_status.nil? ? "" : "(Status #{@http_status}) "
-      "#{status_string}#{@message}"
+      "#{status_string} #{@message} #{@http_body} #{@json_body} 1"
     end
   end
 

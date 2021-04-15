@@ -38,29 +38,32 @@ module Paysimple
 
   @api_endpoint = Endpoint::PRODUCTION
   @ssl_version = Config::DEFAULT_SSL_VERSION
+  @verify_ssl = true
+  @use_ssl = true
 
   class << self
-    attr_accessor :api_key, :api_user, :api_endpoint, :ssl_version
+    attr_accessor :api_key, :api_user, :api_endpoint, :ssl_version, :verify_ssl, :use_ssl
   end
 
-  def self.request(method, url, params={})
+  def self.request(method, url, params = {})
 
     raise AuthenticationError.new('API key is not provided.') unless @api_key
     raise AuthenticationError.new('API user is not provided.') unless @api_user
 
     url = api_url(url)
     case method
-      when :get, :head
-        url += "#{URI.parse(url).query ? '&' : '?'}#{uri_encode(params)}" if params && params.any?
-        payload = nil
-      when :delete
-        payload = nil
-      else
-        payload = Util.camelize_and_symbolize_keys(params).to_json
+    when :get, :head
+      url += "#{URI.parse(url).query ? '&' : '?'}#{uri_encode(params)}" if params && params.any?
+      payload = nil
+    when :delete
+      payload = nil
+    else
+      payload = Util.camelize_and_symbolize_keys(params).to_json
     end
 
-    request_opts = { headers: request_headers, method: method, open_timeout: 30,
-                     payload: payload, url: url, timeout: 80, ssl_version: ssl_version }
+    request_opts = {headers: request_headers, method: method, open_timeout: 30,
+                    payload: payload, url: url, timeout: 80, use_ssl: use_ssl, verify_ssl: verify_ssl}
+
 
     begin
       response = execute_request(request_opts)
@@ -79,7 +82,7 @@ module Paysimple
     parse(response)
   end
 
-  def self.api_url(url='')
+  def self.api_url(url = '')
     @api_endpoint + '/v4' + url
   end
 
@@ -96,7 +99,7 @@ module Paysimple
   end
 
   def self.uri_encode(params)
-    Util.flatten_params(params).map { |k,v| "#{k}=#{Util.url_encode(v)}" }.join('&')
+    Util.flatten_params(params).map { |k, v| "#{k}=#{Util.url_encode(v)}" }.join('&')
   end
 
   def self.parse(response)
@@ -132,32 +135,32 @@ module Paysimple
     end
 
     case rcode
-      when 400, 404
-        errors = error_obj[:meta][:errors][:error_messages].collect { |e| e[:message]}
-        raise InvalidRequestError.new(errors, rcode, rbody, error_obj)
-      when 401
-        error = "Error getting an API token. Check your authentication credentials and resubmit."
-        raise AuthenticationError.new(error, rcode, rbody, error_obj)
-      else
-        error = "There was an error processing the request."
-        raise APIError.new(error, rcode, rbody, error_obj)
+    when 400, 404
+      errors = error_obj[:meta][:errors][:error_messages].collect { |e| e[:message] }
+      raise InvalidRequestError.new(errors, rcode, rbody, error_obj)
+    when 401
+      error = "Error getting an API token. Check your authentication credentials and resubmit."
+      raise AuthenticationError.new(error, rcode, rbody, error_obj)
+    else
+      error = "There was an error processing the request."
+      raise APIError.new(error, rcode, rbody, error_obj)
     end
   end
 
-  def self.handle_restclient_error(e, api_base_url=nil)
+  def self.handle_restclient_error(e, api_base_url = nil)
     connection_message = 'Please check your internet connection and try again.'
 
     case e
-      when RestClient::RequestTimeout
-        message = "Could not connect to Paysimple (#{@api_endpoint}). #{connection_message}"
-      when RestClient::ServerBrokeConnection
-        message = "The connection to the server (#{@api_endpoint}) broke before the " \
+    when RestClient::RequestTimeout
+      message = "Could not connect to Paysimple (#{@api_endpoint}). #{connection_message}"
+    when RestClient::ServerBrokeConnection
+      message = "The connection to the server (#{@api_endpoint}) broke before the " \
         "request completed. #{connection_message}"
-      when SocketError
-        message = 'Unexpected error communicating when trying to connect to Paysimple. ' \
+    when SocketError
+      message = 'Unexpected error communicating when trying to connect to Paysimple. ' \
         'You may be seeing this message because your DNS is not working. '
-      else
-        message = 'Unexpected error communicating with Paysimple. '
+    else
+      message = 'Unexpected error communicating with Paysimple. '
     end
 
     raise APIConnectionError.new(message + "\n\n(Network error: #{e.message})")
